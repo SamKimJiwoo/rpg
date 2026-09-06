@@ -5,19 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>파스텔 퐁당 웹 RPG</title>
     <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
     <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 10px;
+            background: #fdf2f8;
+            font-family: 'Jua', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+        }
+
         #stage-banner {
             position: fixed;
-            top: 40%;
+            top: 35%;
             left: 50%;
             transform: translate(-50%, -50%) scale(0);
             background: linear-gradient(135deg, #f472b6, #db2777);
             color: white;
-            padding: 20px 40px;
+            padding: 15px 30px;
             border-radius: 20px;
-            font-family: 'Jua', sans-serif;
-            font-size: 24px;
+            font-size: 20px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
             box-shadow: 0 10px 30px rgba(219,39,119,0.4);
             z-index: 1000;
@@ -25,6 +41,7 @@
             transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
             opacity: 0;
             text-align: center;
+            white-space: nowrap;
         }
         #stage-banner.show {
             transform: translate(-50%, -50%) scale(1);
@@ -34,21 +51,116 @@
             background: linear-gradient(135deg, #ef4444, #b91c1c);
             box-shadow: 0 10px 30px rgba(185,28,28,0.5);
         }
+
+        /* 모바일 반응형 게임 래퍼 */
+        #game-wrapper {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        canvas {
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            background: #ffffff;
+            border: 4px solid #f472b6;
+            border-radius: 20px;
+            box-shadow: 0 8px 20px rgba(244,114,182,0.25);
+            touch-action: none;
+        }
+
+        #ui-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .panel {
+            background: white;
+            border: 3px solid #fbcfe8;
+            border-radius: 15px;
+            padding: 12px 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .panel h3 {
+            margin: 0 0 8px 0;
+            color: #db2777;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel p {
+            margin: 4px 0;
+            color: #4b5563;
+            font-size: 14px;
+        }
+
+        #log {
+            height: 65px;
+            overflow-y: auto;
+            font-size: 13px;
+            color: #374151;
+            line-height: 1.4;
+            background: #fff1f2;
+            padding: 8px;
+            border-radius: 10px;
+            border: 1px solid #fbcfe8;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-group button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Jua', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            color: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: transform 0.1s ease;
+        }
+
+        .btn-group button:active {
+            transform: scale(0.96);
+        }
+
+        #btn-attack { background: linear-gradient(135deg, #f472b6, #db2777); }
+        #btn-run { background: linear-gradient(135deg, #9ca3af, #6b7280); }
+        #btn-shop { background: linear-gradient(135deg, #34d399, #059669); }
+        #btn-reset { background: linear-gradient(135deg, #f87171, #dc2626); }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
     </style>
 </head>
 <body>
 
-    <!-- 스테이지 및 보스 전환 안내 애니메이션 배너 -->
     <div id="stage-banner">✨ 제 1 스테이지 ✨</div>
 
     <!-- 이름 입력 모달창 -->
-    <div id="name-modal" style="display:flex; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:100;">
-        <div style="background:white; padding:25px; border-radius:20px; border:3px solid #f472b6; text-align:center; font-family:'Jua', sans-serif; width:280px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
-            <h3 style="color:#db2777; margin-top:0;">✨ 용사의 이름을 알려주세요!</h3>
+    <div id="name-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:100; padding: 20px;">
+        <div style="background:white; padding:25px; border-radius:20px; border:3px solid #f472b6; text-align:center; width:100%; max-width:300px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+            <h3 style="color:#db2777; margin-top:0; font-size:18px;">✨ 용사의 이름을 알려주세요!</h3>
             <p style="font-size:13px; color:#6b7280; margin-bottom:15px;">이름은 딱 한 번만 입력받고 계속 기억돼요!</p>
-            <input type="text" id="player-name-input" placeholder="이름 입력..." style="width:80%; padding:10px; border:2px solid #fbcfe8; border-radius:10px; font-family:'Jua', sans-serif; font-size:15px; text-align:center; margin-bottom:15px; outline:none;">
-            <br>
-            <button onclick="savePlayerName()" style="width:100%; padding:10px; background:linear-gradient(135deg, #f472b6, #fb7185); color:white; border:none; border-radius:10px; font-family:'Jua', sans-serif; font-size:15px; cursor:pointer;">모험 시작하기! 🚀</button>
+            <input type="text" id="player-name-input" placeholder="이름 입력..." style="width:100%; padding:10px; border:2px solid #fbcfe8; border-radius:10px; font-family:'Jua', sans-serif; font-size:15px; text-align:center; margin-bottom:15px; outline:none;">
+            <button onclick="savePlayerName()" style="width:100%; padding:11px; background:linear-gradient(135deg, #f472b6, #fb7185); color:white; border:none; border-radius:10px; font-family:'Jua', sans-serif; font-size:15px; cursor:pointer;">모험 시작하기! 🚀</button>
         </div>
     </div>
 
@@ -57,10 +169,10 @@
 
         <div id="ui-container">
             <div class="panel">
-                <h3>💖 <span id="display-name">용사</span> 정보 (<span id="stage-info">Stage 1</span>)</h3>
+                <h3>💖 <span id="display-name">용사</span> <span id="stage-info" style="font-size:13px; color:#db2777;">Stage 1</span></h3>
                 <p>LV: <span id="level">0</span> | EXP: <span id="exp">0</span>/<span id="maxExp">100</span></p>
-                <p>HP: <span id="hp">100</span>/<span id="maxHp">100</span></p>
-                <p>ATK: <span id="atk">10</span> | GOLD: <span id="gold">0</span></p>
+                <p>HP: <span id="hp">100</span>/<span id="maxHp">100</span> | ATK: <span id="atk">10</span></p>
+                <p>GOLD: <span id="gold">0</span> 골드</p>
             </div>
 
             <div class="panel">
@@ -75,18 +187,18 @@
 
             <div class="panel btn-group">
                 <button id="btn-shop" onclick="toggleShop()">🛒 상점</button>
-                <button onclick="clearSaveData()" style="background:linear-gradient(135deg, #f87171, #ef4444);">🔄 데이터 초기화</button>
+                <button id="btn-reset" onclick="clearSaveData()">🔄 초기화</button>
             </div>
         </div>
     </div>
 
     <!-- 상점 모달창 -->
-    <div id="shop-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border:3px solid #f472b6; border-radius:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2); font-family:'Jua', sans-serif; text-align:center; z-index:10;">
+    <div id="shop-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border:3px solid #f472b6; border-radius:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2); font-family:'Jua', sans-serif; text-align:center; z-index:10; width:90%; max-width:300px;">
         <h3 style="color:#db2777; margin-top:0;">🛒 요정의 상점</h3>
-        <p style="font-size:14px; margin-bottom:15px;">모은 골드로 장비를 강화해보세요!</p>
+        <p style="font-size:13px; margin-bottom:15px; color:#4b5563;">모은 골드로 장비를 강화해보세요!</p>
         <div style="display:flex; flex-direction:column; gap:10px;">
-            <button onclick="buyAtkUpgrade()" style="padding:10px; font-family:'Jua', sans-serif; background:#f472b6; color:white; border:none; border-radius:10px; cursor:pointer;">⚔️ 공격력 강화 (+5) - 30 Gold</button>
-            <button onclick="buyHpPotion()" style="padding:10px; font-family:'Jua', sans-serif; background:#34d399; color:white; border:none; border-radius:10px; cursor:pointer;">🧪 HP 완전 회복 - 20 Gold</button>
+            <button onclick="buyAtkUpgrade()" style="padding:10px; font-family:'Jua', sans-serif; background:#f472b6; color:white; border:none; border-radius:10px; cursor:pointer;">⚔️ 공격력 강화 (+5) - 30 G</button>
+            <button onclick="buyHpPotion()" style="padding:10px; font-family:'Jua', sans-serif; background:#34d399; color:white; border:none; border-radius:10px; cursor:pointer;">🧪 HP 완전 회복 - 20 G</button>
             <button onclick="toggleShop()" style="padding:8px; font-family:'Jua', sans-serif; background:#9ca3af; color:white; border:none; border-radius:10px; cursor:pointer;">닫기</button>
         </div>
     </div>
@@ -101,8 +213,8 @@
         
         let player = { 
             name: "용사",
-            stage: 1,         // 무조건 1스테이지
-            phase: 'normal',   // 무조건 일반 페이즈부터
+            stage: 1,
+            phase: 'normal',
             gridX: 5, gridY: 5, 
             pixelX: 5 * TILE_SIZE, pixelY: 5 * TILE_SIZE,
             hp: 100, maxHp: 100, atk: 10, level: 0, exp: 0, maxExp: 100, gold: 0 
@@ -147,7 +259,6 @@
                 try {
                     const data = JSON.parse(savedData);
                     player.name = data.name || "용사";
-                    // 꼬인 값이 들어있어도 무조건 1~스테이지 범위만 허용하도록 방어 코드 추가
                     player.stage = (typeof data.stage === 'number' && data.stage >= 1) ? data.stage : 1;
                     player.phase = (data.phase === 'boss' || data.phase === 'normal') ? data.phase : 'normal';
                     player.level = (typeof data.level === 'number' && data.level >= 0) ? data.level : 0;
@@ -160,9 +271,8 @@
 
                     document.getElementById("name-modal").style.display = "none";
                     updateUI();
-                    addLog(`📂 저장된 데이터를 불러왔습니다. (Stage ${player.stage} - ${player.phase === 'boss' ? '보스전' : '일반'})`);
+                    addLog(`📂 저장된 데이터를 불러왔습니다. (Stage ${player.stage})`);
                 } catch (e) {
-                    // 데이터 파싱 에러나면 깔끔하게 초기화
                     localStorage.removeItem("pastel_rpg_autosave");
                     document.getElementById("name-modal").style.display = "flex";
                 }
@@ -181,13 +291,9 @@
                 let bossHp = Math.floor(250 * powerMultiplier);
                 let bossAtk = Math.floor(18 * powerMultiplier);
                 monsters.push({
-                    gridX: 5,
-                    gridY: 3,
-                    hp: bossHp,
-                    maxHp: bossHp,
-                    atk: bossAtk,
-                    gold: 150 * player.stage,
-                    exp: 1800, // 보스 경험치 1,800 고정
+                    gridX: 5, gridY: 3,
+                    hp: bossHp, maxHp: bossHp, atk: bossAtk,
+                    gold: 150 * player.stage, exp: 1800,
                     type: 'boss',
                     name: `🔥 [제 ${player.stage} 스테이지 보스] 거대 마왕 슬라임`
                 });
@@ -206,15 +312,10 @@
 
                     let template = monsterTypes[Math.floor(Math.random() * monsterTypes.length)];
                     monsters.push({
-                        gridX: rx,
-                        gridY: ry,
-                        hp: template.hp,
-                        maxHp: template.maxHp,
-                        atk: template.atk,
-                        gold: template.gold,
-                        exp: template.exp,
-                        type: template.type,
-                        name: template.name
+                        gridX: rx, gridY: ry,
+                        hp: template.hp, maxHp: template.maxHp, atk: template.atk,
+                        gold: template.gold, exp: template.exp,
+                        type: template.type, name: template.name
                     });
                 }
             }
@@ -246,23 +347,16 @@
         function showStageBanner(text, isBoss = false) {
             const banner = document.getElementById("stage-banner");
             banner.innerText = text;
-            if (isBoss) {
-                banner.classList.add("boss-banner");
-            } else {
-                banner.classList.remove("boss-banner");
-            }
+            if (isBoss) banner.classList.add("boss-banner");
+            else banner.classList.remove("boss-banner");
             banner.classList.add("show");
-            setTimeout(() => {
-                banner.classList.remove("show");
-            }, 2500);
+            setTimeout(() => { banner.classList.remove("show"); }, 2500);
         }
 
         function movePlayer(dx, dy) {
             if (isMoving || currentBattle) return;
-
             let nextX = player.gridX + dx;
             let nextY = player.gridY + dy;
-
             if (nextX >= 0 && nextX < COLS && nextY >= 0 && nextY < ROWS) {
                 player.gridX = nextX;
                 player.gridY = nextY;
@@ -271,15 +365,13 @@
         }
 
         window.addEventListener("keydown", (e) => {
-            if (e.key === "ArrowUp" || e.key === 'w') movePlayer(0, -1);
-            if (e.key === "ArrowDown" || e.key === 's') movePlayer(0, 1);
-            if (e.key === "ArrowLeft" || e.key === 'a') movePlayer(-1, 0);
-            if (e.key === "ArrowRight" || e.key === 'd') movePlayer(1, 0);
+            if (["ArrowUp","KeyW"].includes(e.code)) movePlayer(0, -1);
+            if (["ArrowDown","KeyS"].includes(e.code)) movePlayer(0, 1);
+            if (["ArrowLeft","KeyA"].includes(e.code)) movePlayer(-1, 0);
+            if (["ArrowRight","KeyD"].includes(e.code)) movePlayer(1, 0);
         });
 
-        let touchStartX = 0;
-        let touchStartY = 0;
-
+        let touchStartX = 0, touchStartY = 0;
         canvas.addEventListener("touchstart", (e) => {
             if (e.touches.length === 1) {
                 touchStartX = e.touches[0].clientX;
@@ -289,28 +381,16 @@
 
         canvas.addEventListener("touchend", (e) => {
             if (!touchStartX || !touchStartY) return;
-
-            let touchEndX = e.changedTouches[0].clientX;
-            let touchEndY = e.changedTouches[0].clientY;
-
-            let diffX = touchEndX - touchStartX;
-            let diffY = touchEndY - touchStartY;
+            let diffX = e.changedTouches[0].clientX - touchStartX;
+            let diffY = e.changedTouches[0].clientY - touchStartY;
             const threshold = 30;
 
             if (Math.abs(diffX) > Math.abs(diffY)) {
-                if (Math.abs(diffX) > threshold) {
-                    if (diffX > 0) movePlayer(1, 0);
-                    else movePlayer(-1, 0);
-                }
+                if (Math.abs(diffX) > threshold) movePlayer(diffX > 0 ? 1 : -1, 0);
             } else {
-                if (Math.abs(diffY) > threshold) {
-                    if (diffY > 0) movePlayer(0, 1);
-                    else movePlayer(0, -1);
-                }
+                if (Math.abs(diffY) > threshold) movePlayer(0, diffY > 0 ? 1 : -1);
             }
-
-            touchStartX = 0;
-            touchStartY = 0;
+            touchStartX = 0; touchStartY = 0;
         }, { passive: true });
 
         function updatePlayerPosition() {
@@ -320,7 +400,6 @@
             if (player.pixelX !== targetX || player.pixelY !== targetY) {
                 player.pixelX += (targetX - player.pixelX) * 0.3;
                 player.pixelY += (targetY - player.pixelY) * 0.3;
-
                 if (Math.abs(targetX - player.pixelX) < 0.5) player.pixelX = targetX;
                 if (Math.abs(targetY - player.pixelY) < 0.5) player.pixelY = targetY;
             } else if (isMoving) {
@@ -331,7 +410,6 @@
 
         function checkMonsterCollision() {
             let allCleared = true;
-
             for (let i = 0; i < monsters.length; i++) {
                 let m = monsters[i];
                 if (m.hp > 0) {
@@ -376,11 +454,8 @@
             currentBattle.hp -= damage;
             addLog(`⭐ 콩! ${currentBattle.name}에게 ${damage}의 데미지!`);
 
-            if (currentBattle.hp <= 0) {
-                winBattle();
-            } else {
-                monsterAttack();
-            }
+            if (currentBattle.hp <= 0) winBattle();
+            else monsterAttack();
         }
 
         function monsterAttack() {
@@ -389,10 +464,7 @@
             player.hp -= damage;
             addLog(`💧 앗! ${currentBattle.name}의 반격으로 ${damage} 피해를 입었어요.`);
             updateUI();
-
-            if (player.hp <= 0) {
-                gameOver();
-            }
+            if (player.hp <= 0) gameOver();
         }
 
         function winBattle() {
@@ -453,7 +525,7 @@
                 return;
             }
             const modal = document.getElementById("shop-modal");
-            modal.style.display = modal.style.display === "none" ? "block" : "none";
+            modal.style.display = modal.style.display === "none" ? "flex" : "none";
         }
 
         function buyAtkUpgrade() {
@@ -555,13 +627,9 @@
                 if (m.hp > 0) {
                     let px = m.gridX * TILE_SIZE;
                     let py = m.gridY * TILE_SIZE;
-                    if (m.type === 'slime') {
-                        drawSlime(px, py);
-                    } else if (m.type === 'goblin') {
-                        drawGoblin(px, py);
-                    } else if (m.type === 'boss') {
-                        drawBoss(px, py);
-                    }
+                    if (m.type === 'slime') drawSlime(px, py);
+                    else if (m.type === 'goblin') drawGoblin(px, py);
+                    else if (m.type === 'boss') drawBoss(px, py);
                 }
             }
 
