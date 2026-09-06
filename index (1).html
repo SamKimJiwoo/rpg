@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>파스텔 퐁당 웹 RPG</title>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        #stage-banner {
+            position: fixed;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: linear-gradient(135deg, #f472b6, #db2777);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 20px;
+            font-family: 'Jua', sans-serif;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 30px rgba(219,39,119,0.4);
+            z-index: 1000;
+            pointer-events: none;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
+            opacity: 0;
+            text-align: center;
+        }
+        #stage-banner.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+        #stage-banner.boss-banner {
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+            box-shadow: 0 10px 30px rgba(185,28,28,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 스테이지 및 보스 전환 안내 애니메이션 배너 -->
+    <div id="stage-banner">✨ 제 1 스테이지 ✨</div>
+
+    <!-- 이름 입력 모달창 -->
+    <div id="name-modal" style="display:flex; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:100;">
+        <div style="background:white; padding:25px; border-radius:20px; border:3px solid #f472b6; text-align:center; font-family:'Jua', sans-serif; width:280px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+            <h3 style="color:#db2777; margin-top:0;">✨ 용사의 이름을 알려주세요!</h3>
+            <p style="font-size:13px; color:#6b7280; margin-bottom:15px;">이름은 딱 한 번만 입력받고 계속 기억돼요!</p>
+            <input type="text" id="player-name-input" placeholder="이름 입력..." style="width:80%; padding:10px; border:2px solid #fbcfe8; border-radius:10px; font-family:'Jua', sans-serif; font-size:15px; text-align:center; margin-bottom:15px; outline:none;">
+            <br>
+            <button onclick="savePlayerName()" style="width:100%; padding:10px; background:linear-gradient(135deg, #f472b6, #fb7185); color:white; border:none; border-radius:10px; font-family:'Jua', sans-serif; font-size:15px; cursor:pointer;">모험 시작하기! 🚀</button>
+        </div>
+    </div>
+
+    <div id="game-wrapper">
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+        <div id="ui-container">
+            <div class="panel">
+                <h3>💖 <span id="display-name">용사</span> 정보 (<span id="stage-info">Stage 1</span>)</h3>
+                <p>LV: <span id="level">0</span> | EXP: <span id="exp">0</span>/<span id="maxExp">100</span></p>
+                <p>HP: <span id="hp">100</span>/<span id="maxHp">100</span></p>
+                <p>ATK: <span id="atk">10</span> | GOLD: <span id="gold">0</span></p>
+            </div>
+
+            <div class="panel">
+                <h3>✨ 몽글몽글 로그</h3>
+                <div id="log">움직여서 몬스터를 찾아보세요!</div>
+            </div>
+
+            <div class="panel btn-group">
+                <button id="btn-attack" onclick="playerAttack()" disabled>공격하기</button>
+                <button id="btn-run" onclick="playerRun()" disabled>도망치기</button>
+            </div>
+
+            <div class="panel btn-group">
+                <button id="btn-shop" onclick="toggleShop()">🛒 상점</button>
+                <button onclick="clearSaveData()" style="background:linear-gradient(135deg, #f87171, #ef4444);">🔄 데이터 초기화</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 상점 모달창 -->
+    <div id="shop-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border:3px solid #f472b6; border-radius:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2); font-family:'Jua', sans-serif; text-align:center; z-index:10;">
+        <h3 style="color:#db2777; margin-top:0;">🛒 요정의 상점</h3>
+        <p style="font-size:14px; margin-bottom:15px;">모은 골드로 장비를 강화해보세요!</p>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            <button onclick="buyAtkUpgrade()" style="padding:10px; font-family:'Jua', sans-serif; background:#f472b6; color:white; border:none; border-radius:10px; cursor:pointer;">⚔️ 공격력 강화 (+5) - 30 Gold</button>
+            <button onclick="buyHpPotion()" style="padding:10px; font-family:'Jua', sans-serif; background:#34d399; color:white; border:none; border-radius:10px; cursor:pointer;">🧪 HP 완전 회복 - 20 Gold</button>
+            <button onclick="toggleShop()" style="padding:8px; font-family:'Jua', sans-serif; background:#9ca3af; color:white; border:none; border-radius:10px; cursor:pointer;">닫기</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const TILE_SIZE = 40;
+        const COLS = canvas.width / TILE_SIZE;
+        const ROWS = canvas.height / TILE_SIZE;
+        
+        let player = { 
+            name: "용사",
+            stage: 1,         // 무조건 1스테이지
+            phase: 'normal',   // 무조건 일반 페이즈부터
+            gridX: 5, gridY: 5, 
+            pixelX: 5 * TILE_SIZE, pixelY: 5 * TILE_SIZE,
+            hp: 100, maxHp: 100, atk: 10, level: 0, exp: 0, maxExp: 100, gold: 0 
+        };
+
+        function saveGameData() {
+            const dataToSave = {
+                name: player.name,
+                stage: player.stage,
+                phase: player.phase,
+                level: player.level,
+                exp: player.exp,
+                maxExp: player.maxExp,
+                hp: player.hp,
+                maxHp: player.maxHp,
+                atk: player.atk,
+                gold: player.gold
+            };
+            localStorage.setItem("pastel_rpg_autosave", JSON.stringify(dataToSave));
+        }
+
+        function clearSaveData() {
+            localStorage.removeItem("pastel_rpg_autosave");
+            alert("데이터가 깨끗하게 초기화되었습니다!");
+            location.reload();
+        }
+
+        function savePlayerName() {
+            const inputVal = document.getElementById("player-name-input").value.trim();
+            if (inputVal) {
+                player.name = inputVal;
+            }
+            document.getElementById("name-modal").style.display = "none";
+            saveGameData();
+            updateUI();
+            addLog(`🎉 환영합니다, ${player.name} 용사님! 제 1 스테이지 모험을 시작하세요.`);
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            const savedData = localStorage.getItem("pastel_rpg_autosave");
+            if (savedData) {
+                try {
+                    const data = JSON.parse(savedData);
+                    player.name = data.name || "용사";
+                    // 꼬인 값이 들어있어도 무조건 1~스테이지 범위만 허용하도록 방어 코드 추가
+                    player.stage = (typeof data.stage === 'number' && data.stage >= 1) ? data.stage : 1;
+                    player.phase = (data.phase === 'boss' || data.phase === 'normal') ? data.phase : 'normal';
+                    player.level = (typeof data.level === 'number' && data.level >= 0) ? data.level : 0;
+                    player.exp = data.exp || 0;
+                    player.maxExp = data.maxExp || 100;
+                    player.hp = data.hp || 100;
+                    player.maxHp = data.maxHp || 100;
+                    player.atk = data.atk || 10;
+                    player.gold = data.gold || 0;
+
+                    document.getElementById("name-modal").style.display = "none";
+                    updateUI();
+                    addLog(`📂 저장된 데이터를 불러왔습니다. (Stage ${player.stage} - ${player.phase === 'boss' ? '보스전' : '일반'})`);
+                } catch (e) {
+                    // 데이터 파싱 에러나면 깔끔하게 초기화
+                    localStorage.removeItem("pastel_rpg_autosave");
+                    document.getElementById("name-modal").style.display = "flex";
+                }
+            } else {
+                document.getElementById("name-modal").style.display = "flex";
+            }
+        });
+
+        let monsters = [];
+
+        function spawnMonsters() {
+            monsters = [];
+            let powerMultiplier = 1 + (player.stage - 1) * 0.3;
+
+            if (player.phase === 'boss') {
+                let bossHp = Math.floor(250 * powerMultiplier);
+                let bossAtk = Math.floor(18 * powerMultiplier);
+                monsters.push({
+                    gridX: 5,
+                    gridY: 3,
+                    hp: bossHp,
+                    maxHp: bossHp,
+                    atk: bossAtk,
+                    gold: 150 * player.stage,
+                    exp: 1800, // 보스 경험치 1,800 고정
+                    type: 'boss',
+                    name: `🔥 [제 ${player.stage} 스테이지 보스] 거대 마왕 슬라임`
+                });
+            } else {
+                const monsterTypes = [
+                    { type: 'slime', name: '귀요미 슬라임', hp: Math.floor(30 * powerMultiplier), maxHp: Math.floor(30 * powerMultiplier), atk: Math.floor(5 * powerMultiplier), gold: 15 * player.stage, exp: 30 * player.stage },
+                    { type: 'goblin', name: '꼬마 고블린', hp: Math.floor(50 * powerMultiplier), maxHp: Math.floor(50 * powerMultiplier), atk: Math.floor(8 * powerMultiplier), gold: 30 * player.stage, exp: 50 * player.stage }
+                ];
+
+                for (let i = 0; i < 4; i++) {
+                    let rx, ry;
+                    do {
+                        rx = Math.floor(Math.random() * COLS);
+                        ry = Math.floor(Math.random() * ROWS);
+                    } while (rx === player.gridX && ry === player.gridY);
+
+                    let template = monsterTypes[Math.floor(Math.random() * monsterTypes.length)];
+                    monsters.push({
+                        gridX: rx,
+                        gridY: ry,
+                        hp: template.hp,
+                        maxHp: template.maxHp,
+                        atk: template.atk,
+                        gold: template.gold,
+                        exp: template.exp,
+                        type: template.type,
+                        name: template.name
+                    });
+                }
+            }
+        }
+        spawnMonsters();
+
+        let currentBattle = null;
+        let isMoving = false;
+
+        function addLog(message) {
+            const logDiv = document.getElementById("log");
+            logDiv.innerHTML += `<br>${message}`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateUI() {
+            document.getElementById("display-name").innerText = player.name;
+            const stageText = player.phase === 'boss' ? `Stage ${player.stage} [보스]` : `Stage ${player.stage}`;
+            document.getElementById("stage-info").innerText = stageText;
+            document.getElementById("level").innerText = player.level;
+            document.getElementById("exp").innerText = player.exp;
+            document.getElementById("maxExp").innerText = player.maxExp;
+            document.getElementById("hp").innerText = player.hp;
+            document.getElementById("maxHp").innerText = player.maxHp;
+            document.getElementById("atk").innerText = player.atk;
+            document.getElementById("gold").innerText = player.gold;
+        }
+
+        function showStageBanner(text, isBoss = false) {
+            const banner = document.getElementById("stage-banner");
+            banner.innerText = text;
+            if (isBoss) {
+                banner.classList.add("boss-banner");
+            } else {
+                banner.classList.remove("boss-banner");
+            }
+            banner.classList.add("show");
+            setTimeout(() => {
+                banner.classList.remove("show");
+            }, 2500);
+        }
+
+        function movePlayer(dx, dy) {
+            if (isMoving || currentBattle) return;
+
+            let nextX = player.gridX + dx;
+            let nextY = player.gridY + dy;
+
+            if (nextX >= 0 && nextX < COLS && nextY >= 0 && nextY < ROWS) {
+                player.gridX = nextX;
+                player.gridY = nextY;
+                isMoving = true;
+            }
+        }
+
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowUp" || e.key === 'w') movePlayer(0, -1);
+            if (e.key === "ArrowDown" || e.key === 's') movePlayer(0, 1);
+            if (e.key === "ArrowLeft" || e.key === 'a') movePlayer(-1, 0);
+            if (e.key === "ArrowRight" || e.key === 'd') movePlayer(1, 0);
+        });
+
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        canvas.addEventListener("touchstart", (e) => {
+            if (e.touches.length === 1) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+
+        canvas.addEventListener("touchend", (e) => {
+            if (!touchStartX || !touchStartY) return;
+
+            let touchEndX = e.changedTouches[0].clientX;
+            let touchEndY = e.changedTouches[0].clientY;
+
+            let diffX = touchEndX - touchStartX;
+            let diffY = touchEndY - touchStartY;
+            const threshold = 30;
+
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                if (Math.abs(diffX) > threshold) {
+                    if (diffX > 0) movePlayer(1, 0);
+                    else movePlayer(-1, 0);
+                }
+            } else {
+                if (Math.abs(diffY) > threshold) {
+                    if (diffY > 0) movePlayer(0, 1);
+                    else movePlayer(0, -1);
+                }
+            }
+
+            touchStartX = 0;
+            touchStartY = 0;
+        }, { passive: true });
+
+        function updatePlayerPosition() {
+            let targetX = player.gridX * TILE_SIZE;
+            let targetY = player.gridY * TILE_SIZE;
+
+            if (player.pixelX !== targetX || player.pixelY !== targetY) {
+                player.pixelX += (targetX - player.pixelX) * 0.3;
+                player.pixelY += (targetY - player.pixelY) * 0.3;
+
+                if (Math.abs(targetX - player.pixelX) < 0.5) player.pixelX = targetX;
+                if (Math.abs(targetY - player.pixelY) < 0.5) player.pixelY = targetY;
+            } else if (isMoving) {
+                isMoving = false;
+                checkMonsterCollision();
+            }
+        }
+
+        function checkMonsterCollision() {
+            let allCleared = true;
+
+            for (let i = 0; i < monsters.length; i++) {
+                let m = monsters[i];
+                if (m.hp > 0) {
+                    allCleared = false;
+                    if (player.gridX === m.gridX && player.gridY === m.gridY) {
+                        startBattle(i);
+                        break;
+                    }
+                }
+            }
+
+            if (allCleared) {
+                if (player.phase === 'normal') {
+                    player.phase = 'boss';
+                    showStageBanner(`🔥 경고! 제 ${player.stage} 스테이지 보스 등장! 🔥`, true);
+                    addLog(`⚠️ 필드 소탕 완료! <strong>제 ${player.stage} 스테이지 보스룸</strong>이 개방되었습니다!`);
+                } else {
+                    player.stage++;
+                    player.phase = 'normal';
+                    showStageBanner(`✨ 제 ${player.stage} 스테이지로 진입합니다! ✨`, false);
+                    addLog(`🎉 보스 처치 성공! 새로운 <strong>제 ${player.stage} 스테이지</strong>로 이동합니다.`);
+                }
+                spawnMonsters();
+                saveGameData();
+            }
+        }
+
+        function startBattle(monsterIndex) {
+            currentBattle = monsters[monsterIndex];
+            if (player.phase === 'boss') {
+                addLog(`🔥 <strong>[보스전] ${currentBattle.name}</strong>와(과) 맞붙습니다!`);
+            } else {
+                addLog(`✨ <strong>${currentBattle.name}</strong>을(를) 만났어요!`);
+            }
+            document.getElementById("btn-attack").disabled = false;
+            document.getElementById("btn-run").disabled = false;
+        }
+
+        function playerAttack() {
+            if (!currentBattle) return;
+            const damage = player.atk;
+            currentBattle.hp -= damage;
+            addLog(`⭐ 콩! ${currentBattle.name}에게 ${damage}의 데미지!`);
+
+            if (currentBattle.hp <= 0) {
+                winBattle();
+            } else {
+                monsterAttack();
+            }
+        }
+
+        function monsterAttack() {
+            if (!currentBattle) return;
+            const damage = currentBattle.atk;
+            player.hp -= damage;
+            addLog(`💧 앗! ${currentBattle.name}의 반격으로 ${damage} 피해를 입었어요.`);
+            updateUI();
+
+            if (player.hp <= 0) {
+                gameOver();
+            }
+        }
+
+        function winBattle() {
+            addLog(`🎉 <strong>${currentBattle.name} 처치 성공!</strong> (+EXP ${currentBattle.exp}, +G ${currentBattle.gold})`);
+            player.exp += currentBattle.exp;
+            player.gold += currentBattle.gold;
+            
+            while (player.exp >= player.maxExp) {
+                player.exp -= player.maxExp;
+                player.level++;
+                player.maxExp = Math.floor(player.maxExp * 1.4);
+                player.maxHp += 25;
+                player.hp = player.maxHp;
+                player.atk += 6;
+                addLog(`🌟 <strong>레벨업!</strong> 성장을 통해 LV.${player.level}이 되었어요!`);
+            }
+
+            currentBattle.hp = 0;
+            endBattle();
+            saveGameData();
+        }
+
+        function playerRun() {
+            if (!currentBattle) return;
+            if (player.phase === 'boss') {
+                addLog("⚠️ 보스전에서는 도망칠 수 없습니다!");
+                return;
+            }
+            addLog("💨 호다닥 도망쳤습니다!");
+            if(player.gridX > 0) player.gridX--;
+            else if(player.gridY > 0) player.gridY--;
+            player.pixelX = player.gridX * TILE_SIZE;
+            player.pixelY = player.gridY * TILE_SIZE;
+            endBattle();
+        }
+
+        function endBattle() {
+            currentBattle = null;
+            isMoving = false;
+            document.getElementById("btn-attack").disabled = true;
+            document.getElementById("btn-run").disabled = true;
+            updateUI();
+            checkMonsterCollision();
+        }
+
+        function gameOver() {
+            addLog(`💦 <strong>기절했어요... 게임 오버!</strong>`);
+            updateUI();
+            isMoving = true;
+            document.getElementById("btn-attack").disabled = true;
+            document.getElementById("btn-run").disabled = true;
+            localStorage.removeItem("pastel_rpg_autosave");
+        }
+
+        function toggleShop() {
+            if (currentBattle) {
+                addLog("⚠️ 전투 중에는 상점에 갈 수 없어요!");
+                return;
+            }
+            const modal = document.getElementById("shop-modal");
+            modal.style.display = modal.style.display === "none" ? "block" : "none";
+        }
+
+        function buyAtkUpgrade() {
+            if (player.gold >= 30) {
+                player.gold -= 30;
+                player.atk += 5;
+                addLog("⚔️ 상점에서 공격력을 강화했습니다! (+ATK 5)");
+                updateUI();
+                saveGameData();
+            } else {
+                addLog("💰 골드가 부족해요!");
+            }
+        }
+
+        function buyHpPotion() {
+            if (player.gold >= 20) {
+                player.gold -= 20;
+                player.hp = player.maxHp;
+                addLog("🧪 포션을 마셔 체력을 완전히 회복했습니다!");
+                updateUI();
+                saveGameData();
+            } else {
+                addLog("💰 골드가 부족해요!");
+            }
+        }
+
+        function drawSlime(x, y) {
+            ctx.fillStyle = "#86efac";
+            ctx.beginPath();
+            ctx.arc(x + 20, y + 25, 13, Math.PI, 0, false);
+            ctx.lineTo(x + 33, y + 35);
+            ctx.quadraticCurveTo(x + 20, y + 38, x + 7, y + 35);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = "#065f46";
+            ctx.fillRect(x + 13, y + 20, 3, 3);
+            ctx.fillRect(x + 24, y + 20, 3, 3);
+        }
+
+        function drawGoblin(x, y) {
+            ctx.fillStyle = "#facc15";
+            ctx.beginPath();
+            ctx.arc(x + 20, y + 22, 11, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#ca8a04";
+            ctx.beginPath();
+            ctx.moveTo(x + 9, y + 18); ctx.lineTo(x + 3, y + 12); ctx.lineTo(x + 11, y + 21); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(x + 31, y + 18); ctx.lineTo(x + 37, y + 12); ctx.lineTo(x + 29, y + 21); ctx.fill();
+
+            ctx.fillStyle = "#78350f";
+            ctx.fillRect(x + 13, y + 18, 3, 2);
+            ctx.fillRect(x + 24, y + 18, 3, 2);
+        }
+
+        function drawBoss(x, y) {
+            ctx.fillStyle = "#f43f5e";
+            ctx.beginPath();
+            ctx.arc(x + 20, y + 22, 16, Math.PI, 0, false);
+            ctx.lineTo(x + 36, y + 36);
+            ctx.quadraticCurveTo(x + 20, y + 40, x + 4, y + 36);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = "#fbbf24";
+            ctx.fillRect(x + 14, y + 2, 12, 6);
+            
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(x + 10, y + 18, 5, 5);
+            ctx.fillRect(x + 25, y + 18, 5, 5);
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(x + 12, y + 20, 2, 2);
+            ctx.fillRect(x + 27, y + 20, 2, 2);
+        }
+
+        function drawPlayer(x, y) {
+            ctx.fillStyle = "#60a5fa";
+            ctx.fillRect(x + 10, y + 15, 20, 20);
+
+            ctx.fillStyle = "#fde047";
+            ctx.fillRect(x + 12, y + 6, 16, 12); 
+
+            ctx.fillStyle = "#94a3b8";
+            ctx.fillRect(x + 30, y + 12, 4, 15);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = "#fae8ff";
+            for (let i = 0; i <= canvas.width; i += TILE_SIZE) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            }
+
+            for (let m of monsters) {
+                if (m.hp > 0) {
+                    let px = m.gridX * TILE_SIZE;
+                    let py = m.gridY * TILE_SIZE;
+                    if (m.type === 'slime') {
+                        drawSlime(px, py);
+                    } else if (m.type === 'goblin') {
+                        drawGoblin(px, py);
+                    } else if (m.type === 'boss') {
+                        drawBoss(px, py);
+                    }
+                }
+            }
+
+            drawPlayer(player.pixelX, player.pixelY);
+        }
+
+        function gameLoop() {
+            updatePlayerPosition();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        updateUI();
+        gameLoop();
+    </script>
+</body>
+</html>
